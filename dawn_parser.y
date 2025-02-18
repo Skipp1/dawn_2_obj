@@ -9,7 +9,7 @@
 # define YYSTYPE char*
 #endif
 
-#define YYDEBUG 1
+//#define YYDEBUG 1
 
 void yyerror(const char *c);
 int yylex(void);
@@ -25,8 +25,9 @@ struct yyt_gcr {
 	size_t N;
 } yyt_gcr;
 
-void *self;
-void *line;
+void *self=NULL;
+void *line=NULL;
+void *shape=NULL;
 
 %}
 
@@ -42,6 +43,10 @@ void *line;
 %token ORIGIN
 %token BASEVECTOR
 %token BOX
+%token POLYHEDRON
+%token VERTEX
+%token FACET
+%token ENDPOLYHEDRON
 %token POLYLINE
 %token PLVERTEX
 %token ENDPOLYLINE
@@ -56,61 +61,96 @@ void *line;
 
 %%
 
-program : program statement NEWLINE
-        | statement NEWLINE
+program : program statement 
+        | statement 
         ;
 
-statement : VERSION
-          | DIV
-          | SETCAMERA
-          | OPENDEVICE
-          | BEGINMODELING
+statement : ignored
           | bounding_box 
-          | PVNAME
           | color_rgb
           | force_wireframe
           | origin
           | base_vector
           | box
           | polyline
-          | pl_vertex
-          | endpolyline
-          | ENDMODELING
-          | DRAWALL
-          | CLOSEDEVICE
+          | polyhedron
           ;
 
-bounding_box    : BOUNDINGBOX NUM NUM NUM NUM NUM NUM
-                { printf("%f %f %f %f %f %f\n", atof($2), atof($3), atof($4), atof($5), atof($6), atof($6) ); } 
-force_wireframe : FORCEWIREFRAME NUM;
-base_vector     : BASEVECTOR NUM NUM NUM NUM NUM NUM ; 
+ignored : VERSION NEWLINE
+        | DIV NEWLINE 
+        | SETCAMERA NEWLINE
+        | OPENDEVICE NEWLINE
+        | BEGINMODELING NEWLINE
+        | PVNAME NEWLINE
+        | ENDMODELING NEWLINE
+        | DRAWALL NEWLINE
+        | CLOSEDEVICE NEWLINE
+        ;
 
-color_rgb : COLORRGB  NUM  NUM  NUM
+bounding_box    : BOUNDINGBOX NUM NUM NUM NUM NUM NUM NEWLINE
+                { printf("%f %f %f %f %f %f\n", atof($2), atof($3), atof($4), atof($5), atof($6), atof($6) ); } 
+force_wireframe : FORCEWIREFRAME NUM NEWLINE;
+base_vector     : BASEVECTOR NUM NUM NUM NUM NUM NUM NEWLINE
+                { set_basis(self, atof($2), atof($3), atof($4), atof($5), atof($6), atof($7)); }; 
+
+color_rgb : COLORRGB NUM NUM NUM NEWLINE
           { set_rgb(self, atof($2), atof($3), atof($4) ); }; 
-origin    : ORIGIN  NUM  NUM  NUM
+origin    : ORIGIN NUM NUM NUM NEWLINE
           { set_origin(self, atof($2), atof($3), atof($4) ); }; 
-pl_vertex : PLVERTEX  NUM  NUM  NUM
-          { set_vertex(line, atof($2), atof($3), atof($4) ); }; 
-box       : BOX  NUM  NUM  NUM
+box       : BOX NUM NUM NUM NEWLINE
           { add_box(self, atof($2), atof($3), atof($4) ); yytext_gc_run(); }; 
 
-polyline    : POLYLINE 
-            { line = polyline(); };
-endpolyline : ENDPOLYLINE
-            { add_line(self, line); yytext_gc_run(); }
+
+beginpolyline : POLYLINE NEWLINE
+              { line = polyline(); };
+
+pl_vertex : PLVERTEX NUM NUM NUM NEWLINE
+          { line_add_vertex(line, atof($2), atof($3), atof($4) ); }; 
+
+endpolyline : ENDPOLYLINE NEWLINE
+            { add_line(self, line); line=NULL, yytext_gc_run(); }
+
+multi_pl_vertex : multi_pl_vertex pl_vertex
+                | pl_vertex
+                ;
+
+polyline : beginpolyline multi_pl_vertex endpolyline;
+
+beginpolyhedron : POLYHEDRON NEWLINE
+                { shape = polyhedron(); };
+
+polyhedron_vertex : VERTEX NUM NUM NUM NEWLINE 
+                  { polyhedron_add_vertex(shape, atof($2), atof($3), atof($4) ); };
+
+polyhedron_facet : FACET NUM NUM NUM NEWLINE 
+                 { polyhedron_add_face(shape, atol($2), atol($3), atol($4) ); };
+
+endpolyhedron : ENDPOLYHEDRON NEWLINE 
+              { add_polyhedron(self, shape); shape=NULL, yytext_gc_run(); } 
+
+
+multi_polyhedron_vertex : multi_polyhedron_vertex polyhedron_vertex
+                        | polyhedron_vertex
+                        ; 
+
+multi_polyhedron_facet : multi_polyhedron_facet polyhedron_facet
+                       | polyhedron_facet
+                       ;
+
+polyhedron : beginpolyhedron multi_polyhedron_vertex multi_polyhedron_facet endpolyhedron;
+          
 %%
 
 int main(int argc, char **argv) {
 	
-	extern int yydebug;
-	yydebug = 1;
+	//extern int yydebug;
+	//yydebug = 1;
 	
 	setlocale(LC_ALL, "en_GB.UTF-8");
 	extern FILE *yyin;
 	
-	if (argc != 3) {
+	if (argc != 3 || argc != 2) {
 		fprintf(stderr, "usage: dawn_2_obj INPUT.prim OUTPUT.obj\n");
-		return 1;
 	}
 	
 	yyin = fopen( argv[1], "r+" );
@@ -127,7 +167,7 @@ int main(int argc, char **argv) {
 	yytext_gc_cleanup();
 	fclose(yyin);
 	
-	write_obj(self, argv[2]);
+	write_obj(self, argc, argv);
 	return 0;
 }
 

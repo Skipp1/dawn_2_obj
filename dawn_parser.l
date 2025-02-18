@@ -5,7 +5,8 @@
 #include "y.tab.h"
 #include "dawn_2_obj.h"
 
-#define ECHO printf("%s\n", yytext);
+//#define ECHO printf("%s", yytext);
+#define ECHO {}
 %}
 
 %% 
@@ -27,6 +28,10 @@
 "/Origin"         { ECHO; return ORIGIN; }
 "/BaseVector"     { ECHO; return BASEVECTOR; }
 "/Box"            { ECHO; return BOX; }
+"/Polyhedron"     { ECHO; return POLYHEDRON; }
+"/Vertex"         { ECHO; return VERTEX; }
+"/Facet"          { ECHO; return FACET; }
+"/EndPolyhedron"  { ECHO; return ENDPOLYHEDRON; }
 "/Polyline"       { ECHO; return POLYLINE; }
 "/PLVertex"       { ECHO; return PLVERTEX; }
 "/EndPolyline"    { ECHO; return ENDPOLYLINE; }
@@ -41,7 +46,7 @@
 	return NUM;
 }
 
-\/PVName.* { printf("-"); ECHO; return PVNAME; }
-"\n" { return NEWLINE; }
+\/PVName.* { ECHO; return PVNAME; }
+"\n" { ECHO; return NEWLINE; }
 
 %%
