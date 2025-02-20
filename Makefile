@@ -18,3 +18,10 @@ lex.yy.c: dawn_parser.l
 
 y.tab.c: dawn_parser.y 
 	${YACC} -dyv $<
+
+clean: 
+	rm dawn_2_obj
+	rm lex.yy.c lex.yy.o 
+	rm y.tab.c y.tab.o y.tab.h
+	rm dawn_2_obj.o 
+	rm y.output 

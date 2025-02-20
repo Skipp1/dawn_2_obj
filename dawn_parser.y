@@ -43,6 +43,10 @@ void *shape=NULL;
 %token ORIGIN
 %token BASEVECTOR
 %token BOX
+%token MARKCIRCLE2D
+%token MARKCIRCLE2DS
+%token MARKSQUARE2D
+%token MARKSQUARE2DS
 %token POLYHEDRON
 %token VERTEX
 %token FACET
@@ -74,6 +78,7 @@ statement : ignored
           | box
           | polyline
           | polyhedron
+          | mark
           ;
 
 ignored : VERSION NEWLINE
@@ -86,6 +91,7 @@ ignored : VERSION NEWLINE
         | DRAWALL NEWLINE
         | CLOSEDEVICE NEWLINE
         ;
+
 
 bounding_box    : BOUNDINGBOX NUM NUM NUM NUM NUM NUM NEWLINE
                 { printf("%f %f %f %f %f %f\n", atof($2), atof($3), atof($4), atof($5), atof($6), atof($6) ); } 
@@ -100,6 +106,18 @@ origin    : ORIGIN NUM NUM NUM NEWLINE
 box       : BOX NUM NUM NUM NEWLINE
           { add_box(self, atof($2), atof($3), atof($4) ); yytext_gc_run(); }; 
 
+mark_sphere : MARKCIRCLE2D 
+            | MARKCIRCLE2DS
+            ;
+
+mark_box : MARKSQUARE2D 
+         | MARKSQUARE2DS
+         ;
+
+mark : mark_sphere NUM NUM NUM NUM NEWLINE 
+     { add_sphere_mark(self, atof($2), atof($3), atof($4), atof($5) ); yytext_gc_run(); }
+     | mark_box NUM NUM NUM NUM NEWLINE
+     { add_box_mark(self,  atof($2), atof($3), atof($4), atof($5) ); yytext_gc_run(); }
 
 beginpolyline : POLYLINE NEWLINE
               { line = polyline(); };
@@ -160,14 +178,14 @@ int main(int argc, char **argv) {
 		return 1;
 	}
 	
-	self = construct_model();
+	self = construct_model(argc, argv);
 	
 	yytext_gc_init();
 	yyparse();
 	yytext_gc_cleanup();
 	fclose(yyin);
 	
-	write_obj(self, argc, argv);
+	write_obj(self);
 	return 0;
 }
 
@@ -205,7 +223,8 @@ static void yytext_gc_run(void) {
 
 void yyerror(const char *c) {
 	extern char *yytext;
-	fprintf(stderr, "yerror %s | %s |", c, yytext);
+	extern int yylineno;
+	fprintf(stderr, "yerror line: %d char :%s | %s |", yylineno, c, yytext);
 	for (size_t i=0; i<strlen(yytext); i++) {
 		fprintf(stderr, " 0x%02x ", yytext[i]);
 	}
