@@ -10,14 +10,21 @@ struct polyhedron_t {
 
 class model {
 	public:
+	model(std::string fn):filename(fn){}
+		
 	void add_line(const std::vector<std::array<double, 3>> &line);
-	void add_box(const std::array<double, 3> &s);
+	void add_box(const std::array<double, 3> &oset, const std::array<double, 3> &s);
+	void add_sphere( const std::array<double, 3> &o, double r, double res);
 	void add_polyhedron(const polyhedron_t &p);
 	void add_basis(const std::array<double, 3> &e1, const std::array<double, 3> &e2);
 	void write(const std::string &filename);
 	
 	std::array<double, 3> rgb;
 	std::array<double, 3> origin;
+	
+	const std::string filename;
+	double marker_res = 10;
+	double model_res = 10;
 	
 	private:
 	size_t add_unique_vertex(std::vector<std::array<double, 3>> &v, const std::array<double, 3> &p);
@@ -37,7 +44,7 @@ extern "C" {
 
 void yytext_dup( const char *c );
 	
-void *construct_model();
+void *construct_model(int argc, char **argv);
 
 void set_rgb(void *self, double r, double g, double b);
 void set_origin(void *self, double x, double y, double z);
@@ -48,13 +55,17 @@ void line_add_vertex(void *line, double x, double y, double z);
 void add_line(void *self, void *line );
 
 void add_box(void *self, double dx, double dy, double dz);
+void add_box_mark(void *self, double x, double y, double z, double r);
+
+void add_sphere(void *self, double x, double y, double z, double r);
+void add_sphere_mark(void *self, double x, double y, double z, double r);
 
 void *polyhedron();
 void polyhedron_add_vertex(void *polyhedron, double x, double y, double z);
 void polyhedron_add_face(void *polyhedron, long int i, long int j, long int k);
 void add_polyhedron(void *self, void *polyhedron);
 
-void write_obj(void *self, int argc, char **argv);
+void write_obj(void *self);
 #ifdef __cplusplus
 }
 #endif

@@ -1,9 +1,10 @@
 #include "dawn_2_obj.h"
 #include <numeric>
 #include <sstream>
-#include <iomanip>
 #include <iostream>
+#include <iomanip>
 #include <fstream>
+#include <cmath>
 #include <algorithm>
 #include <vector>
 
@@ -56,7 +57,7 @@ void model::add_basis(const std::array<double, 3> &e1, const std::array<double, 
 	}
 }
 
-void model::add_box(const std::array<double, 3> &s) {
+void model::add_box(const std::array<double, 3> &oset, const std::array<double, 3> &s) {
 	/* Creates a box object. 
 	 * DAWN definition to create a 1$\times$1$\times$1 box: 
 	 * \begin{verbatim}
@@ -87,10 +88,12 @@ void model::add_box(const std::array<double, 3> &s) {
 	 * As you can see this gets a little complex and verbose.
 	 */
 	std::stringstream ss;
-	ss << "g group_" << group_no++ << std::endl;
-	ss << "usemtl colour_" << add_unique_vertex(colour_db, rgb) << std::endl;
 	
-	auto add_face = [this, &s, &ss](int f_){
+	size_t colour_idx = add_unique_vertex(colour_db, rgb);
+	ss << "o box_" << colour_idx << "." << group_no++ << std::endl;
+	ss << "usemtl colour_" << colour_idx << std::endl;
+	
+	auto add_face = [this, &s, &ss, &oset](int f_){
 		int f = std::abs(f_)-1;
 		
 		std::array<std::array<int, 4>, 3> A;
@@ -100,7 +103,7 @@ void model::add_box(const std::array<double, 3> &s) {
 		
 		ss << "f ";
 		for (int i=0; i<4; i++) {
-			ss << add_unique_vertex(vertex_db, {A[0][i]*s[0], A[1][i]*s[1], A[2][i]*s[2]}) << " ";
+			ss << add_unique_vertex(vertex_db, {A[0][i]*s[0]+oset[0], A[1][i]*s[1]+oset[1], A[2][i]*s[2]+oset[2]}) << " ";
 		}
 		ss << std::endl;
 	};
@@ -108,6 +111,43 @@ void model::add_box(const std::array<double, 3> &s) {
 	add_face(-2); add_face(+2);
 	add_face(-1); add_face(+1);
 	
+	obj_db.push_back(ss.str());
+}
+
+void model::add_sphere( const std::array<double, 3> &o, double r, double res) {
+	/* Add a sphere of radius $rR at the point $\vec o$. 
+	 * 
+	 * We currently construct a uv-sphere as that is the easiest for me to code up. 
+	 * This is currently only used as a marker shape, but if I ever am bothered enough to make a geant simulation that has a sphere in it, I'll update the parsing code. 
+	 * 
+	 * The defintion for $(x, y, z)$ is taken from the conversion from spherical coordinates to cartesians. 
+	 */
+	
+	std::stringstream ss;
+	size_t colour_idx = add_unique_vertex(colour_db, rgb);
+	ss << "o sphere_" << colour_idx << "." << group_no++ << std::endl;
+	ss << "usemtl colour_" << colour_idx << std::endl;
+	
+	std::vector<size_t> cur_ring(std::lrint(2*res)+1);
+	std::vector<size_t> old_ring(cur_ring.size());
+	
+	for (long i=0; i<=std::lrint(res); i++){
+		for (size_t j=0; j<cur_ring.size(); j++){
+			double z = r * std::cos(M_PI*(double)i/res);
+			double y = r * std::sin(M_PI*(double)i/res) * std::sin(2*M_PI*(double)j/(2*res));
+			double x = r * std::sin(M_PI*(double)i/res) * std::cos(2*M_PI*(double)j/(2*res));
+			cur_ring[j] = add_unique_vertex(vertex_db, {x+o[0], y+o[1], z+o[2]});
+		}
+		if (i != 0) {
+			for (size_t j=0; j<cur_ring.size(); j++){
+				ss << "f " << cur_ring[j] 
+				   <<  " " << cur_ring[(j+1)%old_ring.size()] 
+				   <<  " " << old_ring[(j+1)%old_ring.size()]
+				   <<  " " << old_ring[j] << std::endl;
+			}
+		}
+		old_ring = cur_ring;
+	}
 	obj_db.push_back(ss.str());
 }
 
@@ -124,8 +164,9 @@ void model::add_line(const std::vector<std::array<double, 3>> &line) {
 	 * This is Implemented in the obj using the \verb|l| command.
 	 */
 	std::stringstream ss;
-	ss << "g group_" << group_no++ << std::endl;
-	ss << "usemtl colour_" << add_unique_vertex(colour_db, rgb) << std::endl;
+	size_t colour_idx = add_unique_vertex(colour_db, rgb);
+	ss << "o line_" << colour_idx << "." << group_no++ << std::endl;
+	ss << "usemtl colour_" << colour_idx << std::endl;
 	ss << "l";
 	for (const auto &p : line ) {
 		ss << " " << add_unique_vertex(vertex_db, p);
@@ -159,8 +200,9 @@ void model::add_polyhedron(const polyhedron_t &p) {
 	}
 	
 	std::stringstream ss;
-	ss << "g group_" << group_no++ << std::endl;
-	ss << "usemtl colour_" << add_unique_vertex(colour_db, rgb) << std::endl;
+	size_t colour_idx = add_unique_vertex(colour_db, rgb);
+	ss << "o mesh_" << colour_idx << "." << group_no++ << std::endl;
+	ss << "usemtl colour_" << colour_idx << std::endl;
 	for ( const auto &f : p.f ) {
 		ss << "f " << m[f[0]-1] << " " << m[f[1]-1] << " " << m[f[2]-1] << std::endl;
 	}
@@ -198,44 +240,62 @@ T *safe_cast(void *self) {
 	exit(1);
 }
 
-extern "C" void *construct_model() {
-	return static_cast<void *>(new model);
+void *construct_model(int argc, char **argv) {
+	std::string filename = (argc == 3) ? argv[2] : argv[1];
+	return static_cast<void *>(
+		new model(filename.substr(0, filename.find_last_of('.')))
+	);
 }
 
-extern "C" void set_rgb(void *_self, double r, double g, double b){
+void set_rgb(void *_self, double r, double g, double b){
 	auto self = safe_cast<model>(_self); 
 	self->rgb = {r, g, b};
 }
 
-extern "C" void set_origin(void *_self, double x, double y, double z){
+void set_origin(void *_self, double x, double y, double z){
 	auto self = safe_cast<model>(_self); 
 	self->origin = {x, y, z};
 }
 
-extern "C" void set_basis(void *_self, double e1x, double e1y, double e1z, double e2x, double e2y, double e2z) { 
+void set_basis(void *_self, double e1x, double e1y, double e1z, double e2x, double e2y, double e2z) { 
 	auto self = safe_cast<model>(_self); 
 	self->add_basis({e1x, e1y, e1z}, {e2x, e2y, e2z});
 }
 
-extern "C" void *polyline() {
+void *polyline() {
 	return static_cast<void *>(new std::vector<std::array<double, 3>>);
 }
 
-extern "C" void line_add_vertex(void * _line, double x, double y, double z){
+void line_add_vertex(void * _line, double x, double y, double z){
 	auto line = safe_cast<std::vector<std::array<double, 3>>>(_line); 
 	line->push_back({x, y, z});
 }
 
-extern "C" void add_line(void *_self, void *_line) {
+void add_line(void *_self, void *_line) {
 	auto self = safe_cast<model>(_self); 
 	auto line = safe_cast<std::vector<std::array<double, 3>>>(_line); 
 	self->add_line(*line);
 	delete line;
 }
 
-extern "C" void add_box(void *_self, double dx, double dy, double dz) {
+void add_box(void *_self, double dx, double dy, double dz) {
 	auto self = safe_cast<model>(_self); 
-	self->add_box({dz, dy, dz});
+	self->add_box({0., 0., 0.}, {dx, dy, dz});
+}
+
+void add_box_mark(void *_self, double x, double y, double z, double r) {
+	auto self = safe_cast<model>(_self); 
+	self->add_box({x, y, z}, {r/10., r/10., r/10.});
+}
+
+void add_sphere(void *_self, double x, double y, double z, double r) {
+	auto self = safe_cast<model>(_self); 
+	self->add_sphere({x, y, z}, r/10., self->model_res);
+}
+
+void add_sphere_mark(void *_self, double x, double y, double z, double r) {
+	auto self = safe_cast<model>(_self); 
+	self->add_sphere({x, y, z}, r, self->marker_res);
 }
 
 void *polyhedron() {
@@ -259,9 +319,7 @@ void add_polyhedron(void *_self, void *_polyhedron) {
 	delete polyhedron;
 }
 
-extern "C" void write_obj(void *_self, int argc, char **argv) {
+void write_obj(void *_self) {
 	auto self = safe_cast<model>(_self); 
-	std::string filename = (argc == 3) ? argv[2] : argv[1];
-	filename = filename.substr(0, filename.find_last_of('.'));
-	self->write( filename );
+	self->write( self->filename );
 }

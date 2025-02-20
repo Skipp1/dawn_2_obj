@@ -6,7 +6,7 @@
 #include "dawn_2_obj.h"
 
 //#define ECHO printf("%s", yytext);
-#define ECHO {}
+#define ECHO {};
 %}
 
 %% 
@@ -28,6 +28,10 @@
 "/Origin"         { ECHO; return ORIGIN; }
 "/BaseVector"     { ECHO; return BASEVECTOR; }
 "/Box"            { ECHO; return BOX; }
+"/MarkCircle2DS"  { ECHO; return MARKCIRCLE2DS; }
+"/MarkCircle2D"   { ECHO; return MARKCIRCLE2D; }
+"/MarkSquare2DS"  { ECHO; return MARKSQUARE2DS; }
+"/MarkSquare2D"   { ECHO; return MARKSQUARE2D; }
 "/Polyhedron"     { ECHO; return POLYHEDRON; }
 "/Vertex"         { ECHO; return VERTEX; }
 "/Facet"          { ECHO; return FACET; }
