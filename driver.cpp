@@ -1,4 +1,7 @@
-#include "dawn_2_obj.h"
+#include "driver.h"
+
+#include <stdarg.h>
+
 #include <numeric>
 #include <sstream>
 #include <iostream>
@@ -8,7 +11,8 @@
 #include <algorithm>
 #include <vector>
 
-size_t model::add_unique_vertex(std::vector<std::array<double, 3>> &v, const std::array<double, 3> &p) {
+namespace dawn {
+size_t driver::add_unique_vertex(std::vector<std::array<double, 3>> &v, const std::array<double, 3> &p) {
 	/* Adds a new vertex applying the origin offset and the basis transfomation. 
 	 * Returns the index of the vertex for use later in the obj file. 
 	 * 
@@ -36,7 +40,7 @@ size_t model::add_unique_vertex(std::vector<std::array<double, 3>> &v, const std
 	}
 }
 
-void model::add_basis(const std::array<double, 3> &e1, const std::array<double, 3> &e2) {
+void driver::add_basis(const std::array<double, 3> &e1, const std::array<double, 3> &e2) {
 	/* Defines the current rotation that the next object created will follow.
 	 * \begin{verbatim}
 	 * /BaseVector 1 0 0 0 1 0 
@@ -57,7 +61,7 @@ void model::add_basis(const std::array<double, 3> &e1, const std::array<double, 
 	}
 }
 
-void model::add_box(const std::array<double, 3> &oset, const std::array<double, 3> &s) {
+void driver::add_box(const std::array<double, 3> &oset, const std::array<double, 3> &s) {
 	/* Creates a box object. 
 	 * DAWN definition to create a 1$\times$1$\times$1 box: 
 	 * \begin{verbatim}
@@ -114,7 +118,7 @@ void model::add_box(const std::array<double, 3> &oset, const std::array<double, 
 	obj_db.push_back(ss.str());
 }
 
-void model::add_sphere( const std::array<double, 3> &o, double r, double res) {
+void driver::add_sphere( const std::array<double, 3> &o, double r, double res) {
 	/* Add a sphere of radius $rR at the point $\vec o$. 
 	 * 
 	 * We currently construct a uv-sphere as that is the easiest for me to code up. 
@@ -151,7 +155,7 @@ void model::add_sphere( const std::array<double, 3> &o, double r, double res) {
 	obj_db.push_back(ss.str());
 }
 
-void model::add_line(const std::vector<std::array<double, 3>> &line) {
+void driver::add_line(const std::vector<std::array<double, 3>> &line) {
 	/* Adds a line defined by a set of verticies. 
 	 * \begin{verbatim}
 	 * /Polyline 
@@ -175,7 +179,7 @@ void model::add_line(const std::vector<std::array<double, 3>> &line) {
 	obj_db.push_back(ss.str());
 }
 
-void model::add_polyhedron(const polyhedron_t &p) {
+void driver::add_polyhedron(const std::vector<std::array<double, 3>> &v, const std::vector<std::vector<long int>> &f) {
 	/* adds a generic polyhedron to the obj file. 
 	 * The structure of the DAWN file is similar to the object file, but with a few differences. 
 	 * 
@@ -195,7 +199,7 @@ void model::add_polyhedron(const polyhedron_t &p) {
 	 * 
 	 */
 	std::vector<size_t> m;
-	for ( const auto &v : p.v ) {
+	for ( const auto &v : v ) {
 		m.push_back(add_unique_vertex(vertex_db, v));
 	}
 	
@@ -203,18 +207,22 @@ void model::add_polyhedron(const polyhedron_t &p) {
 	size_t colour_idx = add_unique_vertex(colour_db, rgb);
 	ss << "o mesh_" << colour_idx << "." << group_no++ << std::endl;
 	ss << "usemtl colour_" << colour_idx << std::endl;
-	for ( const auto &f : p.f ) {
-		ss << "f " << m[f[0]-1] << " " << m[f[1]-1] << " " << m[f[2]-1] << std::endl;
+	for ( const auto &idx : f ) {
+		ss << "f";
+		for ( const auto &i : idx ) { 
+			ss << " " << m[i-1];
+		}
+		ss << std::endl;
 	}
 	obj_db.push_back(ss.str());
 }
 
-void model::write(const std::string &filename) {
+void driver::write() {
 	/*
 	 * Writes the obj file to an actual file. 
 	 * The precision is set to 8dp, this can be changed. 
 	 */
-	std::ofstream fp_obj(filename + ".obj");
+	std::ofstream fp_obj(filename_out + ".obj");
 	fp_obj << std::setprecision(8) << std::fixed;
 	for (const auto &v : vertex_db) {
 		fp_obj << "v " << v[0] << " " << v[1] << " " << v[2] << " " << std::endl;
@@ -224,7 +232,7 @@ void model::write(const std::string &filename) {
 	}
 	fp_obj.close();
 	
-	std::ofstream fp_mat(filename + ".mtl");
+	std::ofstream fp_mat(filename_out + ".mtl");
 	fp_mat << std::setprecision(8) << std::fixed;
 	for ( size_t i=1; const auto &v : colour_db ) { 
 		fp_mat << "newmtl color_" << i++ << std::endl;
@@ -233,93 +241,14 @@ void model::write(const std::string &filename) {
 	fp_mat.close();
 }
 
-template <typename T>
-T *safe_cast(void *self) {
-	if (self != NULL) return static_cast<T *>(self);
-	std::fprintf(stderr, "Unable to open %s. You probs have a syntax error in your prim file\n", typeid(T).name());
+std::string driver::help() {
+	/*
+	 * Prints help and exits. 
+	 * Typename is just for compatibility 
+	 */
+	std::fprintf(stderr, "./dawn_2_obj <input file> <output file>\n");
 	exit(1);
+
 }
 
-void *construct_model(int argc, char **argv) {
-	std::string filename = (argc == 3) ? argv[2] : argv[1];
-	return static_cast<void *>(
-		new model(filename.substr(0, filename.find_last_of('.')))
-	);
-}
-
-void set_rgb(void *_self, double r, double g, double b){
-	auto self = safe_cast<model>(_self); 
-	self->rgb = {r, g, b};
-}
-
-void set_origin(void *_self, double x, double y, double z){
-	auto self = safe_cast<model>(_self); 
-	self->origin = {x, y, z};
-}
-
-void set_basis(void *_self, double e1x, double e1y, double e1z, double e2x, double e2y, double e2z) { 
-	auto self = safe_cast<model>(_self); 
-	self->add_basis({e1x, e1y, e1z}, {e2x, e2y, e2z});
-}
-
-void *polyline() {
-	return static_cast<void *>(new std::vector<std::array<double, 3>>);
-}
-
-void line_add_vertex(void * _line, double x, double y, double z){
-	auto line = safe_cast<std::vector<std::array<double, 3>>>(_line); 
-	line->push_back({x, y, z});
-}
-
-void add_line(void *_self, void *_line) {
-	auto self = safe_cast<model>(_self); 
-	auto line = safe_cast<std::vector<std::array<double, 3>>>(_line); 
-	self->add_line(*line);
-	delete line;
-}
-
-void add_box(void *_self, double dx, double dy, double dz) {
-	auto self = safe_cast<model>(_self); 
-	self->add_box({0., 0., 0.}, {dx, dy, dz});
-}
-
-void add_box_mark(void *_self, double x, double y, double z, double r) {
-	auto self = safe_cast<model>(_self); 
-	self->add_box({x, y, z}, {r/10., r/10., r/10.});
-}
-
-void add_sphere(void *_self, double x, double y, double z, double r) {
-	auto self = safe_cast<model>(_self); 
-	self->add_sphere({x, y, z}, r/10., self->model_res);
-}
-
-void add_sphere_mark(void *_self, double x, double y, double z, double r) {
-	auto self = safe_cast<model>(_self); 
-	self->add_sphere({x, y, z}, r, self->marker_res);
-}
-
-void *polyhedron() {
-	return static_cast<void *>(new polyhedron_t());
-}
-
-void polyhedron_add_vertex(void *_polyhedron, double x, double y, double z) {
-	auto polyhedron = safe_cast<polyhedron_t>(_polyhedron); 
-	polyhedron->v.push_back({x, y, z});
-}
-
-void polyhedron_add_face(void *_polyhedron, long int i, long int j, long int k) {
-	auto polyhedron = safe_cast<polyhedron_t>(_polyhedron); 
-	polyhedron->f.push_back({i, j, k});
-}
-
-void add_polyhedron(void *_self, void *_polyhedron) {
-	auto self = safe_cast<model>(_self); 
-	auto polyhedron = safe_cast<polyhedron_t>(_polyhedron); 
-	self->add_polyhedron(*polyhedron);
-	delete polyhedron;
-}
-
-void write_obj(void *_self) {
-	auto self = safe_cast<model>(_self); 
-	self->write( self->filename );
-}
+}// NAMEPSACE dawn 
