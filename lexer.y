@@ -1,56 +1,78 @@
-%option yylineno 
-%option noyywrap
 %{
 
-#include "y.tab.h"
-#include "dawn_2_obj.h"
+#include <cstdlib>
+
+#include "lexer.h"
 
 //#define ECHO printf("%s", yytext);
 #define ECHO {};
+
+#undef  YY_DECL
+#define YY_DECL int dawn::lexer::yylex( dawn::parser::semantic_type * const lval )
+
+using token = dawn::parser::token;
+
 %}
+
+%option yyclass="dawn::lexer"
+%option debug 
+%option noyywrap 
+%option nodefault 
+%option yylineno 
+%option c++
 
 %% 
 
+%{
+	yylval = lval;
+%}
+
+
 ^##G4.PRIM-FORMAT-[0-9\.]+ { 
 	ECHO;
-	yytext_dup(yytext); 
-	return VERSION;
+	return token::VERSION;
 }
 
-"#--------------------" { ECHO; return DIV; }
+"#--------------------" { ECHO; return token::DIV; }
 
-"/BoundingBox"    { ECHO; return BOUNDINGBOX; }
-"!SetCamera"      { ECHO; return SETCAMERA; }
-"!OpenDevice"     { ECHO; return OPENDEVICE; }
-"!BeginModeling"  { ECHO; return BEGINMODELING; }
-"/ColorRGB"       { ECHO; return COLORRGB; }
-"/ForceWireframe" { ECHO; return FORCEWIREFRAME; }
-"/Origin"         { ECHO; return ORIGIN; }
-"/BaseVector"     { ECHO; return BASEVECTOR; }
-"/Box"            { ECHO; return BOX; }
-"/MarkCircle2DS"  { ECHO; return MARKCIRCLE2DS; }
-"/MarkCircle2D"   { ECHO; return MARKCIRCLE2D; }
-"/MarkSquare2DS"  { ECHO; return MARKSQUARE2DS; }
-"/MarkSquare2D"   { ECHO; return MARKSQUARE2D; }
-"/Polyhedron"     { ECHO; return POLYHEDRON; }
-"/Vertex"         { ECHO; return VERTEX; }
-"/Facet"          { ECHO; return FACET; }
-"/EndPolyhedron"  { ECHO; return ENDPOLYHEDRON; }
-"/Polyline"       { ECHO; return POLYLINE; }
-"/PLVertex"       { ECHO; return PLVERTEX; }
-"/EndPolyline"    { ECHO; return ENDPOLYLINE; }
-"!EndModeling"    { ECHO; return ENDMODELING; }
-"!DrawAll"        { ECHO; return DRAWALL; }
-"!CloseDevice"    { ECHO; return CLOSEDEVICE; }
+"/BoundingBox"    { ECHO; return token::BOUNDINGBOX; }
+"!SetCamera"      { ECHO; return token::SETCAMERA; }
+"!OpenDevice"     { ECHO; return token::OPENDEVICE; }
+"!BeginModeling"  { ECHO; return token::BEGINMODELING; }
+"/ColorRGB"       { ECHO; return token::COLORRGB; }
+"/ForceWireframe" { ECHO; return token::FORCEWIREFRAME; }
+"/Origin"         { ECHO; return token::ORIGIN; }
+"/BaseVector"     { ECHO; return token::BASEVECTOR; }
+"/Box"            { ECHO; return token::BOX; }
+"/MarkCircle2DS"  { ECHO; return token::MARKCIRCLE2DS; }
+"/MarkCircle2D"   { ECHO; return token::MARKCIRCLE2D; }
+"/MarkSquare2DS"  { ECHO; return token::MARKSQUARE2DS; }
+"/MarkSquare2D"   { ECHO; return token::MARKSQUARE2D; }
+"/Polyhedron"     { ECHO; return token::POLYHEDRON; }
+"/Vertex"         { ECHO; return token::VERTEX; }
+"/Facet"          { ECHO; return token::FACET; }
+"/EndPolyhedron"  { ECHO; return token::ENDPOLYHEDRON; }
+"/Polyline"       { ECHO; return token::POLYLINE; }
+"/PLVertex"       { ECHO; return token::PLVERTEX; }
+"/EndPolyline"    { ECHO; return token::ENDPOLYLINE; }
+"!EndModeling"    { ECHO; return token::ENDMODELING; }
+"!DrawAll"        { ECHO; return token::DRAWALL; }
+"!CloseDevice"    { ECHO; return token::CLOSEDEVICE; }
 
 
-[+-]?[0-9]+(\.[0-9]*)?([eE][+-]?[0-9]+)? {
-	ECHO; 
-	yytext_dup(yytext);
-	return NUM;
+[+-]?[0-9]+\.([0-9]*)?([eE][+-]?[0-9]+)? {
+	ECHO;
+	yylval->build<double>(std::atof(yytext));
+	return token::REAL_MOD_INT;
 }
 
-\/PVName.* { ECHO; return PVNAME; }
-"\n" { ECHO; return NEWLINE; }
+-?[0-9]+ {
+	ECHO;
+	yylval->build<long int>(std::atol(yytext));
+	return token::INT;
+}
+
+\/PVName.* { ECHO; return token::PVNAME;  }
+"\n"       { ECHO; return token::NEWLINE; }
 
 %%

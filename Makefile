@@ -1,27 +1,28 @@
 YACC=bison 
-LEX=flex
-CC=gcc 
+LEX=flex++
 CXX=g++
 LD=ld
 
-CFLAGS=-Ofast -march=native -mtune=native -flto -Wall -Wextra -c
+CFLAGS=-g -Ofast -march=native -mtune=native -flto -Wall -Wextra -c
 LINK=-flto
 
-dawn_2_obj: dawn_2_obj.cpp dawn_2_obj.h lex.yy.c y.tab.c 
-	${CXX} ${CFLAGS} dawn_2_obj.cpp -o dawn_2_obj.o
-	${CC}  ${CFLAGS} lex.yy.c -o lex.yy.o
-	${CC}  ${CFLAGS} y.tab.c -o y.tab.o
-	${CXX} ${LINK}  y.tab.o lex.yy.o dawn_2_obj.o -o dawn_2_obj
+FILES=$(shell ls)
 
-lex.yy.c: dawn_parser.l 
-	${LEX} $< 
+dawn_2_obj: driver.cpp driver.h lex.yy.cc parser.tab.cc
+	${CXX} ${CFLAGS} driver.cpp -o driver.o
+	${CXX} ${CFLAGS} lex.yy.cc -o lex.yy.o
+	${CXX} ${CFLAGS} parser.tab.cc -o parser.tab.o
+	${CXX} ${LINK}   parser.tab.o lex.yy.o driver.o -o dawn_2_obj
 
-y.tab.c: dawn_parser.y 
-	${YACC} -dyv $<
+lex.yy.cc: lexer.l lexer.h parser.tab.cc
+	${LEX} lexer.l
+
+parser.tab.cc: parser.y 
+	${YACC} --no-lines -dv $<
 
 clean: 
-	rm dawn_2_obj
-	rm lex.yy.c lex.yy.o 
-	rm y.tab.c y.tab.o y.tab.h
-	rm dawn_2_obj.o 
-	rm y.output 
+	-rm dawn_2_obj
+	-rm lex.yy.cc lex.yy.o 
+	-rm parser.tab.cc parser.tab.o parser.tab.hh
+	-rm driver.o 
+	-rm parser.output 
