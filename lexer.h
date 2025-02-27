@@ -17,6 +17,8 @@ namespace dawn {
 		virtual int yylex(
 			parser::semantic_type * const lval
 		);
+		
+	size_t lineno = 0;
 	private:
 		dawn::parser::semantic_type *yylval = nullptr;
 	};

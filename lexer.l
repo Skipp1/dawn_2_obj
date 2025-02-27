@@ -15,10 +15,7 @@ using token = dawn::parser::token;
 %}
 
 %option yyclass="dawn::lexer"
-%option debug 
 %option noyywrap 
-%option nodefault 
-%option yylineno 
 %option c++
 
 %% 
@@ -30,6 +27,7 @@ using token = dawn::parser::token;
 
 ^##G4.PRIM-FORMAT-[0-9\.]+ { 
 	ECHO;
+	yylval->build<std::string>(std::string(yytext));
 	return token::VERSION;
 }
 
@@ -73,6 +71,10 @@ using token = dawn::parser::token;
 }
 
 \/PVName.* { ECHO; return token::PVNAME;  }
-"\n"       { ECHO; return token::NEWLINE; }
+"\n"       { 
+	ECHO; 
+	lineno++;
+	return token::NEWLINE;\
+}
 
 %%

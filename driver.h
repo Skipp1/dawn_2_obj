@@ -13,6 +13,7 @@ class driver {
 		: fp_in(fn_in, std::ios::in)
 		, filename_out(fn_out)
 		{
+			std::printf("constructing ...\n");
 			if (!fp_in.is_open()) {
 				std::fprintf(stderr, "Unable to open file %s.", fn_in.c_str());
 				exit(1);
@@ -25,9 +26,9 @@ class driver {
 	
 	driver(int argc, char ** argv) 
 		: driver( 
-			  (argc==0) ? help() 
-			: (argc==1) ? driver(argv[1])
-			: (argc==2) ? driver(argv[1], argv[2])
+			  (argc==1) ? help() 
+			: (argc==2) ? driver(argv[1])
+			: (argc==3) ? driver(argv[1], argv[2])
 			: help()
 		) 
 		{};
@@ -44,8 +45,8 @@ class driver {
 	std::array<double, 3> rgb;
 	std::array<double, 3> origin;
 	
-	const double marker_res = 5;
-	const double model_res = 5;
+	const double markres  = 3.;
+	const double marksize = 1/10.;
 	
 	std::ifstream fp_in;
 	const std::string filename_out;
