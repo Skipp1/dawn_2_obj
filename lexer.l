@@ -46,6 +46,12 @@ using token = dawn::parser::token;
 "/MarkCircle2D"   { ECHO; return token::MARKCIRCLE2D; }
 "/MarkSquare2DS"  { ECHO; return token::MARKSQUARE2DS; }
 "/MarkSquare2D"   { ECHO; return token::MARKSQUARE2D; }
+"/Ndiv"           { ECHO; return token::NDIV; }
+"/Tubs"           { ECHO; return token::TUBS; }
+"/Trap"           { ECHO; return token::TRAP; }
+"/Trd"            { ECHO; return token::TRD; }
+"/Torus"          { ECHO; return token::TORUS; }
+"/Cons"           { ECHO; return token::CONS; }
 "/Polyhedron"     { ECHO; return token::POLYHEDRON; }
 "/Vertex"         { ECHO; return token::VERTEX; }
 "/Facet"          { ECHO; return token::FACET; }
@@ -70,11 +76,21 @@ using token = dawn::parser::token;
 	return token::INT;
 }
 
-\/PVName.* { ECHO; return token::PVNAME;  }
-"\n"       { 
+\/PVName.* {
+	ECHO; 
+	std::string volname(yytext);
+	std::string substr(volname.substr(volname.find_last_of(" ")+1, volname.size()));
+	yylval->build<std::string>(substr);
+	if (lineno % 1000 == 0) {
+		std::printf("Processing PV: %s on Line number %ld\n", substr.c_str(), lineno);
+	}
+	return token::PVNAME;  
+}
+
+"\n" { 
 	ECHO; 
 	lineno++;
-	return token::NEWLINE;\
+	return token::NEWLINE;
 }
 
 %%
