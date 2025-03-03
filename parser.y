@@ -52,7 +52,6 @@
 %token SETCAMERA
 %token OPENDEVICE
 %token BEGINMODELING
-%token PVNAME
 %token COLORRGB
 %token FORCEWIREFRAME
 %token ORIGIN
@@ -62,6 +61,12 @@
 %token MARKCIRCLE2DS
 %token MARKSQUARE2D
 %token MARKSQUARE2DS
+%token NDIV 
+%token TUBS
+%token TRAP
+%token TRD
+%token CONS
+%token TORUS
 %token POLYHEDRON
 %token VERTEX
 %token FACET
@@ -73,6 +78,8 @@
 %token DRAWALL
 %token CLOSEDEVICE
 
+
+%token <std::string> PVNAME
 %token <std::string> VERSION
 %token <double> REAL_MOD_INT
 %token <long int> INT
@@ -86,13 +93,20 @@ program : program statement
 
 statement : ignored
           | bounding_box 
+          | pvname
           | color_rgb
           | force_wireframe
           | origin
           | base_vector
+          | ndiv
           | box
           | polyline
           | polyhedron
+          | tubs
+          | cons
+          | trap
+          | trd
+          | torus
           | mark
           | drawall
           ;
@@ -102,7 +116,6 @@ ignored : VERSION NEWLINE
         | SETCAMERA NEWLINE
         | OPENDEVICE NEWLINE
         | BEGINMODELING NEWLINE
-        | PVNAME NEWLINE
         | ENDMODELING NEWLINE
         | CLOSEDEVICE NEWLINE
         ;
@@ -113,11 +126,15 @@ real : REAL_MOD_INT {$$=std::move($1);}
      | INT {$$=static_cast<double>($1);}
      ;
 
+pvname : PVNAME NEWLINE 
+       { drv.pv_name = std::move($1); }
+       ;
+
 bounding_box    : BOUNDINGBOX real real real real real real NEWLINE
                 { std::printf("%f %f %f %f %f %f\n", $2, $3, $4, $5, $6, $7); } 
 force_wireframe : FORCEWIREFRAME INT NEWLINE;
 base_vector     : BASEVECTOR real real real real real real NEWLINE
-                { drv.add_basis({std::move($2), std::move($3), std::move($4)}, {std::move($5), std::move($6), std::move($7)}); }; 
+                { drv.set_basis({std::move($2), std::move($3), std::move($4)}, {std::move($5), std::move($6), std::move($7)}); }; 
 
 drawall : DRAWALL NEWLINE { drv.write(); };
 
@@ -136,11 +153,40 @@ mark_box : MARKSQUARE2D
          | MARKSQUARE2DS
          ;
 
+
 mark : mark_sphere real real real real NEWLINE 
      { drv.add_sphere({std::move($2), std::move($3), std::move($4)}, $5*drv.marksize, drv.markres ); }
      | mark_box real real real real NEWLINE
      { drv.add_box({std::move($2), std::move($3), std::move($4)}, {$5*drv.marksize, $5*drv.marksize, $5*drv.marksize} ); }
      ;
+
+ndiv : NDIV INT NEWLINE 
+     { drv.ndiv = std::move($2); }
+     ;
+
+tubs : TUBS real real real real real NEWLINE
+     { drv.add_tubs(std::move($2), std::move($3), std::move($4), std::move($5), std::move($6)); }
+     ;
+
+cons : CONS real real real real real real real NEWLINE
+     { drv.add_cons({std::move($2), std::move($3)}, {std::move($4), std::move($5)}
+                   , std::move($6), std::move($7) ,  std::move($8) ); }
+     ;
+
+trap : TRAP real real real real real real real real real real real NEWLINE
+     { drv.add_trap( std::move($2) , std::move($3) , std::move($4)
+                   , std::move($5) , std::move($6) , std::move($7)
+                   , std::move($8) , std::move($9) , std::move($10)
+                   , std::move($11), std::move($12)); }
+     ;
+
+trd : TRD real real real real real NEWLINE
+     { drv.add_trd( std::move($2) , std::move($3) , std::move($4), std::move($5) , std::move($6) ); }
+     ;
+
+torus : TORUS real real real real real NEWLINE
+      { drv.add_torus(std::move($2), std::move($3), std::move($4), std::move($5), std::move($6)); }
+      ;
 
 %nterm <std::array<double, 3>> pl_vertex;
 pl_vertex : PLVERTEX real real real NEWLINE
@@ -188,26 +234,16 @@ polyhedron : POLYHEDRON NEWLINE multi_polyhedron_vertex multi_polyhedron_facet E
 
 %%
 
-int main(int argc, char **argv) {
-	
-	
-	setlocale(LC_ALL, "en_GB.UTF-8");
-	
-	if (argc != 3 || argc != 2) {
-		fprintf(stderr, "usage: dawn_2_obj INPUT.prim OUTPUT.obj\n");
-	}
-	
-	auto drv = dawn::driver(argc, argv);
-	auto lex = dawn::lexer(&drv.fp_in);
-	
-	dawn::parser parse(lex, drv);
-	//parse.set_debug_level(1);
-	parse();
-	
-	return 0;
-}
-
 void dawn::parser::error(const std::string &msg) {
-	fprintf(stderr, "parser error: %s %ld \n", msg.c_str(), lex.lineno);
+	fprintf(stderr, "parser error: %s on line %ld \n", msg.c_str(), lex.lineno+1);
+	
+	std::string line;
+	drv.fp_in.seekg(0);
+	for (size_t i=0; i<lex.lineno+1; i++) {
+		std::getline(drv.fp_in, line);
+	}
+	std::cerr << line << std::endl;
+	
+	exit(1);
 	return;
 }
