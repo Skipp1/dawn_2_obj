@@ -29,10 +29,17 @@ class driver {
 			}
 			fp_out << std::setprecision(8) << std::fixed;
 			if (!fp_mat.is_open()) {
-				std::fprintf(stderr, "Unable to open file %s..mat", fn_out.c_str());
+				std::fprintf(stderr, "Unable to open file %s.mat", fn_out.c_str());
 				exit(1);
 			}
 			fp_mat << std::setprecision(8) << std::fixed;
+			if (!fp_f_out.is_open()) {
+				std::fprintf(stderr, "Unable to open file %s.obj_faces", fn_out.c_str());
+				exit(1);
+			}
+			fp_f_out << std::setprecision(8) << std::fixed;
+			
+			fp_out << "mtllib " << fn_out << ".mtl" << std::endl;
 		};
 	
 	driver(const std::string &fn_in)
@@ -85,6 +92,7 @@ class driver {
 	std::vector<std::array<double, 3>> vertex_db, colour_db; 
 	std::string obj_db;
 	std::map<std::string, size_t> o_name_db;
+	std::map<std::string, std::vector<std::vector<size_t>>> line_db;
 	
 	std::array<std::array<double, 3>, 3> xform = { std::array<double, 3>{1, 0, 0}
 	                                             , std::array<double, 3>{0, 1, 0}

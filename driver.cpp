@@ -119,7 +119,7 @@ void driver::add_torus(double rmin, double rmax, double rtor, double phi_0, doub
 
 
 void driver::add_cons(std::array<double, 2> rmin, std::array<double, 2> rmax, double dz, double phi_0, double phi) {
-
+	if (filter_object()) return;
 	std::stringstream ss = add_object("cons");
 	
 	std::array<std::vector<size_t>, 4> rings;
@@ -178,8 +178,8 @@ void driver::add_box(const std::array<double, 3> &oset, const std::array<double,
 	 * 
 	 * As you can see this gets a little complex and verbose.
 	 */
-
 	
+	if (filter_object()) return;
 	std::stringstream ss = add_object("box");
 	std::array<size_t, 8> vs;
 	vs[0] = add_unique_vertex({ s[0]+oset[0],  s[1]+oset[1],  s[2]+oset[2]});
@@ -215,8 +215,7 @@ void driver::add_sphere( const std::array<double, 3> &o, double r, double res) {
 	 * The defintion for $(x, y, z)$ is taken from the conversion from spherical coordinates to cartesians. 
 	 */
 	
-
-	
+	if (filter_object()) return;
 	std::stringstream ss = add_object("sphere");
 	std::vector<size_t> cur_ring(std::lrint(2*res)+1);
 	std::vector<size_t> old_ring(cur_ring.size());
@@ -253,15 +252,20 @@ void driver::add_line(const std::vector<std::array<double, 3>> &line) {
 	 * \end{verbatim}
 	 * 
 	 * This is Implemented in the obj using the \verb|l| command.
-	 */
-
-	std::stringstream ss = add_object("line");
-	ss << "l";
+	 * 
+	 * We write out all the lines at the end as there are normally a lot of them and its best if we group them.
+	 */ 
+	
+	if (filter_object() or line.size() < 2) return;
+	std::string name = (!pv_name.empty()) ? pv_name : "line";
+	name.append("_" + std::to_string(get_rgb(rgb)));
+	
+	std::vector<size_t> v;
 	for (const auto &p : line ) {
-		ss << " " << add_unique_vertex(p);
+		v.push_back(add_unique_vertex(p));
 	}
-	ss << std::endl;
-	obj_db = ss.str();
+	line_db[name].push_back(v);
+	pv_name.clear();
 	write_tmp();
 }
 
@@ -282,14 +286,14 @@ void driver::add_polyhedron(const std::vector<std::array<double, 3>> &v, const s
 	 * Therefore if there are 2 polyhedron in a file they will both have a vertex 1. 
 	 * 
 	 * The other diffrences are the transformations such as origin offsets and basis vector rotations. 
-	 * 
 	 */
+	
+	if (filter_object()) return;
 	std::vector<size_t> m;
 	for ( const auto &v : v ) {
 		m.push_back(add_unique_vertex(v));
 	}
 	
-
 	std::stringstream ss = add_object("mesh");
 	for ( const auto &idx : f ) {
 		ss << "f";
@@ -319,7 +323,8 @@ void driver::add_tubs(double rmin, double rmax, double dz, double phi_0, double 
 	dphi   & extension of azimuthal angle, dphi = $[0, 2\pi]$ \\
 	\end{tabular}
 	*/
-
+	
+	if (filter_object()) return;
 	std::stringstream ss = add_object("tubs");
 	std::array<std::vector<size_t>, 4> rings;
 	
@@ -369,8 +374,7 @@ void driver::add_trap(double dz, double theta, double phi, double h1, double bl1
 	alpha2 & angle formed the y axis and a line joining middle points of the two x-directional edges of the bottom trapezoid
 	*/
 	
-
-	
+	if (filter_object()) return;
 	std::stringstream ss = add_object("trap");
 	double cx = dz * tan(theta)*cos(phi);
 	double cy = dz * tan(theta)*sin(phi);
@@ -395,8 +399,7 @@ void driver::add_trap(double dz, double theta, double phi, double h1, double bl1
 
 
 void driver::add_trd(double dx1, double dx2, double dy1, double dy2, double dz) {
-
-	
+	if (filter_object()) return;
 	std::stringstream ss = add_object("trd");
 	std::array<size_t, 8> vs;
 	vs[0] = add_unique_vertex({ +dx2, +dy2,  dz });
@@ -417,13 +420,11 @@ void driver::write_tmp() {
 	 * Writes the obj file to an actual file. 
 	 * The precision is set to 8dp, this can be changed. 
 	 */
-	if ( !filter_object() ) {
-		for (const auto &v : vertex_db) {
-			fp_out << "v " << v[0] << " " << v[1] << " " << v[2] << " " << std::endl;
-		}
-		vertex_idx_offset += vertex_db.size();
-		fp_f_out << obj_db << std::endl;
+	for (const auto &v : vertex_db) {
+		fp_out << "v " << v[0] << " " << v[1] << " " << v[2] << " " << std::endl;
 	}
+	vertex_idx_offset += vertex_db.size();
+	fp_f_out << obj_db << std::endl;
 	vertex_db.clear();
 	obj_db.clear();
 }
@@ -433,13 +434,34 @@ void driver::write() {
 	fp_f_out.close();
 	std::ifstream fp_f_out_in(filename_out + ".obj_faces");
 	fp_out << fp_f_out_in.rdbuf();
+	
+	for (const auto &[k, lss] : line_db) {
+		fp_out << "o " << k << std::endl;
+		fp_out << "usemtl colour" << k.substr(k.find_last_of("_")) << std::endl;
+		for (const auto &ls : lss) {
+			fp_out << "l";
+			for (const auto &l : ls) {
+				fp_out << " " << l;
+			}
+			fp_out << std::endl;
+		}
+	}
+	
 	fp_out.close();
 	
 	std::remove((filename_out + ".obj_faces").c_str());
 	
 	for ( size_t i=1; const auto &v : colour_db ) { 
-		fp_mat << "newmtl color_" << i++ << std::endl;
+		fp_mat << "newmtl colour_" << i++ << std::endl;
+		fp_mat << "Ns 250" << std::endl;
+		fp_mat << "Ka 1 1 1" << std::endl;
 		fp_mat << "Kd " << v[0] << " " << v[1] << " " << v[2] << " " << std::endl;
+		fp_mat << "Ks 0.5 0.5 0.5" << std::endl;
+		fp_mat << "Ke 0 0 0" << std::endl;
+		fp_mat << "Ni 1.45" << std::endl;
+		fp_mat << "d 1" << std::endl;
+		fp_mat << "illum 2" << std::endl;
+		fp_mat << std::endl;
 	}
 	fp_mat.close();
 }
