@@ -9,6 +9,8 @@ class filter_driver : public dawn::driver {
 	bool filter_object() override {
 		return pv_name.rfind("lv", 0) == 0;
 	}
+	public:
+	filter_driver(const std::string &s) : driver(s){};
 };
 */
 
