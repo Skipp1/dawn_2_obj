@@ -4,7 +4,7 @@ CXX=g++
 LD=ld
 
 CFLAGS=-Ofast -march=native -mtune=native -flto -Wall -Wextra -c
-LINK=-flto -lfmt -fwhole-program
+LINK=-flto -fwhole-program
 
 FILES=$(shell ls)
 
