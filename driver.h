@@ -1,5 +1,6 @@
 #ifndef __DAWN_2_OBJ_MODEL__
 #define __DAWN_2_OBJ_MODEL__
+#include <memory>
 #include <string> 
 #include <array> 
 #include <vector>
@@ -7,6 +8,7 @@
 #include <fstream>
 #include <map>
 #include <iomanip>
+#include <regex>
 
 namespace dawn {
 class driver {
@@ -14,32 +16,12 @@ class driver {
 	driver(const std::string &fn_in, const std::string &fn_out)
 		: fp_in(fn_in, std::ios::in)
 		, filename_out(fn_out)
-	  , fp_out(fn_out + ".obj")
-		, fp_mat(fn_out + ".mtl")
-	  , fp_f_out(fn_out + ".obj_faces")
 		{
 			std::printf("constructing ...\n");
 			if (!fp_in.is_open()) {
 				std::fprintf(stderr, "Unable to open file %s.", fn_in.c_str());
 				exit(1);
 			}
-			if (!fp_out.is_open()) {
-				std::fprintf(stderr, "Unable to open file %s.obj", fn_out.c_str());
-				exit(1);
-			}
-			fp_out << std::setprecision(8) << std::fixed;
-			if (!fp_mat.is_open()) {
-				std::fprintf(stderr, "Unable to open file %s.mat", fn_out.c_str());
-				exit(1);
-			}
-			fp_mat << std::setprecision(8) << std::fixed;
-			if (!fp_f_out.is_open()) {
-				std::fprintf(stderr, "Unable to open file %s.obj_faces", fn_out.c_str());
-				exit(1);
-			}
-			fp_f_out << std::setprecision(8) << std::fixed;
-			
-			fp_out << "mtllib " << fn_out << ".mtl" << std::endl;
 		};
 	
 	driver(const std::string &fn_in)
@@ -57,11 +39,7 @@ class driver {
 	void add_torus(double rmin, double rmax, double rtor, double phi_0, double phi);
 	
 	void set_basis(const std::array<double, 3> &e1, const std::array<double, 3> &e2);
-	virtual bool filter_object() {return false;};
-	void write_tmp();
 	void write();
-	
-	std::string help() const;
 	
 	std::array<double, 3> origin;
 	std::array<double, 3> rgb;
@@ -74,25 +52,25 @@ class driver {
 	std::ifstream fp_in;
 	const std::string filename_out;
 	
+	std::vector<std::regex> remove_pv;
+	
 	private:
-	size_t vertex_idx_offset = 0;
 	
-	std::ofstream fp_out;
-	std::ofstream fp_mat;
-	std::ofstream fp_f_out;
+	struct object {
+		std::vector<std::vector<size_t>> f;
+		std::vector<std::array<double, 3>> v;
+		size_t c;
+	};
 	
-	std::pair<std::string, bool> o_name(const std::string &dflt, size_t colour_idx);
-	std::string old_pv_name;
-	
-	std::stringstream add_object(const std::string &type);
-	size_t add_unique_vertex(const std::array<double, 3> &p);
-	void   eight_faces(std::stringstream &ss, const std::array<size_t, 8> &vs) const;
+	object* add_object(const std::string &type);
+	size_t add_unique_vertex(object *obj, const std::array<double, 3> &p);
+	void   six_faces(object *obj, const std::array<size_t, 8> &vs) const;
 	size_t get_rgb(const std::array<double, 3> &v);
+	bool   filter_object();
 	
-	std::vector<std::array<double, 3>> vertex_db, colour_db; 
-	std::string obj_db;
-	std::map<std::string, size_t> o_name_db;
-	std::map<std::string, std::vector<std::vector<size_t>>> line_db;
+	std::vector<std::array<double, 3>> colour_db; 
+	std::map<std::string, object>      obj_db;
+	std::map<std::string, object>      line_db;
 	
 	std::array<std::array<double, 3>, 3> xform = { std::array<double, 3>{1, 0, 0}
 	                                             , std::array<double, 3>{0, 1, 0}
