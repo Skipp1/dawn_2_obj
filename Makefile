@@ -8,7 +8,7 @@ LINK=-flto -fwhole-program
 
 FILES=$(shell ls)
 
-dawn_2_obj: driver.cpp driver.h lex.yy.cc parser.tab.cc
+dawn_2_obj: driver.cpp driver.h lex.yy.cc parser.tab.cc main.cpp
 	${CXX} ${CFLAGS} driver.cpp -o driver.o
 	${CXX} ${CFLAGS} main.cpp -o main.o
 	${CXX} ${CFLAGS} lex.yy.cc -o lex.yy.o
