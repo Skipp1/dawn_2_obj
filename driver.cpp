@@ -204,7 +204,79 @@ void driver::add_line(const std::vector<std::array<double, 3>> &line) {
 	pv_name.clear();
 }
 
-
+// Modified version of geant that writes out timing information of tracks too. 
+// This is a nonstandard dawn file, but it does allow us to make pretty animations. 
+/* 
+diff --git a/source/visualization/FukuiRenderer/include/G4FRSceneFunc.icc b/source/visualization/FukuiRenderer/include/G4FRSceneFunc.icc
+index 0f836d1ee..050df4d39 100644
+--- a/source/visualization/FukuiRenderer/include/G4FRSceneFunc.icc
++++ b/source/visualization/FukuiRenderer/include/G4FRSceneFunc.icc
+@@ -78,11 +98,19 @@ void G4FRSCENEHANDLER::AddPrimitive (const G4Polyline& polyline)
+ 	SendStr( FR_POLYLINE );
+ 
+ 	//----- vertices on polyline
++	if ( nPoints==2
++		&& !std::isnan(polyline.GetVisAttributes()->GetEndTime())
++		&& !std::isnan(polyline.GetVisAttributes()->GetStartTime())
++	) {
++		// If we are drawing with time, each polyline will only have 2 verticies.
++		SendStrDouble4( FR_PL_VERTEX, polyline.GetVisAttributes()->GetStartTime(), polyline[0].x(), polyline[0].y(), polyline[0].z() );
++		SendStrDouble4( FR_PL_VERTEX, polyline.GetVisAttributes()->GetEndTime(),   polyline[1].x(), polyline[1].y(), polyline[1].z() );
++	} else {
+ 		for ( i = 0; i < nPoints; i++ ) {
+-	  SendStrDouble3( FR_PL_VERTEX   , \
+-			  polyline[i].x(), \
+-			  polyline[i].y(), \
+-			  polyline[i].z()   );
++			SendStrDouble3( FR_PL_VERTEX, 
++				polyline[i].x(), polyline[i].y(), polyline[i].z()  
++			);
++		}
+ 	}
+ 
+ 		//----- send ending of polyline
+*/
+void driver::add_line(const std::vector<std::array<double, 4>> &line) {
+	if (filter_object() or line.size() < 2 ) return;
+	
+	size_t colour_idx = get_rgb(rgb);
+	std::string name = (!pv_name.empty()) ? pv_name : "line";
+	name.append("_" + std::to_string(get_rgb(rgb)));
+	
+	auto l = &line_db[name];
+	l->c = colour_idx;
+	
+	if (line.size() != 2) {
+		std::cerr << "skipped polyline " << pv_name << std::endl << "\tReason: polyline had timing information, but more than 2 vertices." << std::endl;
+		return;
+	}
+	
+	auto vv_op3 = [](auto op, const std::array<double, 3> &a, const std::array<double, 3> &b)->std::array<double, 3>{
+		return {op(a[0], b[0]), op(a[1], b[1]), op(a[2], b[2])};
+	};
+	auto sv_op3 = [](auto op, double s, const std::array<double, 3> &a)->std::array<double, 3>{
+		return {op(s, a[0]), op(s, a[1]), op(s, a[2])};
+	};
+	
+	if ( line[0][0] < time_slice ) {
+		// Geant only puts the start and end times at the point where the particle interacts. 
+		// If we want a smooth animation between the interactions then we need to interpolate. 
+		// This is just a simple linear interpolation between 2 points in 3d space.
+		double f = ( line[1][0] < time_slice ) ? 1. : (time_slice - line[0][0])/(line[1][0] - line[0][0]);
+		
+		std::array<double, 3> a = { line[0][1], line[0][2], line[0][3] };
+		std::array<double, 3> b = { line[1][1], line[1][2], line[1][3] };
+		
+		std::array<double, 3> new_pnt = vv_op3( std::plus<double>{} 
+		                                      , a
+		                                      , sv_op3( std::multiplies<double>{}
+		                                              , f
+		                                              , vv_op3(std::minus<double>{}, b, a) 
+		                                      ) 
+		                                );
+		l->f.push_back({ add_unique_vertex(l, a), add_unique_vertex(l, new_pnt) });
+	}
+}
 
 void driver::add_torus(double rmin, double rmax, double rtor, double phi_0, double phi) {
 	std::cerr << "skipped torus " << pv_name << std::endl << "\tReason: torus is not yet implemented" << std::endl;

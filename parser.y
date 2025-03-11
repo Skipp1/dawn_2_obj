@@ -188,17 +188,30 @@ torus : TORUS real real real real real NEWLINE
       { drv.add_torus(std::move($2), std::move($3), std::move($4), std::move($5), std::move($6)); }
       ;
 
-%nterm <std::array<double, 3>> pl_vertex;
-pl_vertex : PLVERTEX real real real NEWLINE
+%nterm <std::array<double, 3>> pl_3vertex;
+pl_3vertex : PLVERTEX real real real NEWLINE
           { $$={std::move($2), std::move($3), std::move($4)}; }; 
+          
+%nterm <std::array<double, 4>> pl_4vertex;
+pl_4vertex : PLVERTEX real real real real NEWLINE
+        { $$={std::move($2), std::move($3), std::move($4), std::move($5)}; }
+        ;
 
-%nterm <std::vector<std::array<double, 3>>> multi_pl_vertex;
-multi_pl_vertex : multi_pl_vertex pl_vertex { $1.push_back($2); $$ = std::move($1); }
-                | pl_vertex { $$ = std::vector<std::array<double, 3>>({std::move($1)}); }
-                ;
+%nterm <std::vector<std::array<double, 4>>> multi_pl_4vertex;
+multi_pl_4vertex : multi_pl_4vertex pl_4vertex { $1.push_back($2); $$ = std::move($1); }
+                 | pl_4vertex { $$ = std::vector<std::array<double, 4>> {std::move($1)}; }
+                 ;
+                 
+%nterm <std::vector<std::array<double, 3>>> multi_pl_3vertex;
+multi_pl_3vertex : multi_pl_3vertex pl_3vertex { $1.push_back($2); $$ = std::move($1); }
+                 | pl_3vertex { $$ = std::vector<std::array<double, 3>>{std::move($1)}; }
+                 ;
 
-polyline : POLYLINE NEWLINE multi_pl_vertex ENDPOLYLINE NEWLINE 
-         { drv.add_line(std::move($3)); };
+
+polyline : POLYLINE NEWLINE multi_pl_3vertex ENDPOLYLINE NEWLINE 
+         { drv.add_line(std::move($3)); }
+         | POLYLINE NEWLINE multi_pl_4vertex ENDPOLYLINE NEWLINE
+         { drv.add_line(std::move($3)); }
 
 %nterm <std::array<double, 3>> polyhedron_vertex;
 polyhedron_vertex : VERTEX real real real NEWLINE

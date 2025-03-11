@@ -1,5 +1,6 @@
 #ifndef __DAWN_2_OBJ_MODEL__
 #define __DAWN_2_OBJ_MODEL__
+#include <limits>
 #include <memory>
 #include <string> 
 #include <array> 
@@ -29,6 +30,7 @@ class driver {
 		{};
 	
 	void add_line(const std::vector<std::array<double, 3>> &line);
+	void add_line(const std::vector<std::array<double, 4>> &line);
 	void add_box(const std::array<double, 3> &oset, const std::array<double, 3> &s);
 	void add_sphere( const std::array<double, 3> &o, double r, double res);
 	void add_tubs(double rmin, double rmax, double dz, double sphi, double dphi);
@@ -48,6 +50,7 @@ class driver {
 	
 	const double markres  = 3.;
 	const double marksize = 1/10.;
+	double time_slice = std::numeric_limits<double>::max();
 	
 	std::ifstream fp_in;
 	const std::string filename_out;
