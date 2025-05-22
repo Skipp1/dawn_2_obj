@@ -3,7 +3,7 @@ LEX=flex++
 CXX=g++
 LD=ld
 
-CFLAGS=-Ofast -march=native -mtune=native -flto -Wall -Wextra -c
+CFLAGS=-DNDEBUG -Ofast -march=native -mtune=native -flto -Wall -Wextra -c
 LINK=-flto -fwhole-program
 
 FILES=$(shell ls)

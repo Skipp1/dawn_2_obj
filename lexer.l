@@ -65,6 +65,14 @@ using token = dawn::parser::token;
 
 
 [+-]?[0-9]+\.([0-9]*)?([eE][+-]?[0-9]+)? {
+	// Normal Doubles
+	ECHO;
+	yylval->build<double>(std::atof(yytext));
+	return token::REAL_MOD_INT;
+}
+
+[+-]?0[xX][0-9a-fA-F](\.[0-9a-fA-F]+)?([pP][+-]?[0-9]+) {
+	// HexFloat Doubles
 	ECHO;
 	yylval->build<double>(std::atof(yytext));
 	return token::REAL_MOD_INT;
@@ -81,7 +89,7 @@ using token = dawn::parser::token;
 	std::string volname(yytext);
 	std::string substr(volname.substr(volname.find_last_of(" ")+1, volname.size()));
 	yylval->build<std::string>(substr);
-	if (lineno % 1000 == 0) {
+	if (lineno % 10000 == 0) {
 		std::printf("Processing PV: %s on Line number %ld\n", substr.c_str(), lineno);
 	}
 	return token::PVNAME;  
